@@ -8,23 +8,61 @@ import matplotlib.patches as patches
 import cv2
 from shapely.geometry import Polygon
 
-# Read Configuration
-config = configparser.ConfigParser()
-config.read("config.ini")
+# Constants
+CONFIG_FILE_PATH = "config.ini"
 
-# Access settings
-global_params = {}
-for key in config["GLOBAL_PARAMS"]:
-    values = config["GLOBAL_PARAMS"][key].split(", ")
-    global_params[int(key)] = (values[0], int(values[1]), float(values[2]))
+def read_configuration(file_path):
+    '''
+    Read the configuration from a given file and return the parsed parameters.
 
-chessboard_corners_prediction_model = config["MODELS"][
-    "chessboard_corners_prediction_model"
-]
-chess_pieces_prediction_model = config["MODELS"]["chess_pieces_prediction_model"]
+    Args:
+        file_path (str): Path to the configuration file.
+
+    Returns:
+        tuple: Contains two dictionaries, 
+               the first for global parameters and 
+               the second for trained models.
+    '''
+    
+    config = configparser.ConfigParser()
+    config.read(file_path)
+
+    try:
+        global_params = {}
+        for key in config["GLOBAL_PARAMS"]:
+            values = config["GLOBAL_PARAMS"][key].split(", ")
+            global_params[int(key)] = (values[0], int(values[1]), float(values[2]))
+
+        model_configs = {
+            "chessboard_corners": config["MODELS"]["chessboard_corners_prediction_model"],
+            "chess_pieces": config["MODELS"]["chess_pieces_prediction_model"]
+        }
+
+        return global_params, model_configs
+
+    except KeyError as e:
+        raise KeyError(f"Missing key in configuration: {e}")
+
+# Use the function
+global_params, models = read_configuration(CONFIG_FILE_PATH)
+chessboard_corners_prediction_model = models["chessboard_corners"]
+chess_pieces_prediction_model = models["chess_pieces"]
 
 
 def calculate_iou(box_1, box_2):
+    '''Calculate Intersection over Union (IoU) for two boxes
+
+    Args:
+        box_1: First box to calculate IoU for.
+            List of four (x,y) tuples creating a box
+        box_2: Second box to calculate IoU for.
+            List of four (x,y) tuples creating a box
+
+    Returns:
+        float: Intersection over Union (IoU) of the two boxes.
+            Value between 0 and 1.
+
+    '''
     poly_1 = Polygon(box_1)
     poly_2 = Polygon(box_2)
     iou = poly_1.intersection(poly_2).area / poly_1.union(poly_2).area
@@ -32,6 +70,18 @@ def calculate_iou(box_1, box_2):
 
 
 def box_to_points(box):
+    '''Convert a box represented by left, top, right edges to a list of four corners
+
+    Args:
+        box: A tuple representing the bounding box
+            in the format (left, top, right, bottom).
+
+
+    Returns:
+        List of four corner points of the bounding box
+            (top left, top right, bottom right and bottom left)
+
+    '''
     l, t, r, b = box
     tl = [l, t]
     tr = [r, t]
@@ -42,6 +92,19 @@ def box_to_points(box):
 
 
 def half_box_to_points(box):
+    '''Convert a box represented by left, top, right edges to a list of four corners
+        that represent the bottom half of the box
+
+    Args:
+        box: A tuple representing the box
+            in the format (left, top, right, bottom).
+
+
+    Returns:
+        List of four corner points of bottom half of the box
+            (top left, top right, bottom right and bottom left)
+
+    '''
     l, t, r, b = box
     t = t + (b - t) / 2
     tl = [l, t]
@@ -53,6 +116,18 @@ def half_box_to_points(box):
 
 
 def non_maximum_suppression(predicted_boxes, iou_threshold=0.80):
+    '''Eliminate predictions with Intersection over Union (IoU) over 0.8 leaving prediction with more confidence
+
+    Args:
+        predicted_boxes: A list of predicted bounding boxes.
+            Each bounding box is represented as a tuple (left, top, right, bottom, confidence_score).
+        iou_threshold: Threshold for the IoU overlap; any boxes with IoU above this threshold
+            will be removed. Defaults to 0.80.
+    Returns:
+        A list of non-overlapping bounding boxes after applying
+            non-maximum suppression.
+
+    '''
     # Sort boxes based on confidence scores
     sorted_boxes = sorted(predicted_boxes, key=lambda x: x[4], reverse=True)
     kept_boxes = []
@@ -72,6 +147,19 @@ def non_maximum_suppression(predicted_boxes, iou_threshold=0.80):
 
 
 def board_to_squares(chessboard_image):
+    '''Split a chessboard image into individual square regions.
+
+    Given an image of a chessboard, this function divides the image into 8x8 squares,
+    returning the coordinates of each square.
+
+    Args:
+        chessboard_image: The input image of the chessboard, which should be in the shape (height, width, channels).
+
+    Returns:
+        An 8x8x4 array containing the coordinates of each square on the chessboard.
+            Each coordinate is in the format (left, top, right, bottom).
+
+    '''
     squares = np.zeros((8, 8, 4))
     height, width = chessboard_image.shape[:2]
     square_width = width / 8
@@ -88,6 +176,24 @@ def board_to_squares(chessboard_image):
 
 
 def detections_to_square(predictions, squares):
+    '''Assign detected predictions to the most overlapping squares on a chessboard.
+
+    For each prediction, function calculates Intersection over Union (IoU) of bottm half of the bounding box with all
+    squares on the chessboard. The prediction is then assigned to the square with which it has the highest IoU,
+    provided that IoU is higher than any previously seen IoU for that square.
+
+    Args:
+        predictions:A list of detected object predictions. Each prediction is represented as a tuple,
+            where the first four values are bounding box coordinates in the format (left, top, right, bottom),
+            and the sixth value is the class index of the predicted object.
+        squares:An 8x8x4 array containing the coordinates of each square on the chessboard.
+            Each coordinate is in the format (left, top, right, bottom).
+
+    Returns:
+        An 8x8 matrix representing the chessboard, where each cell contains a class name
+            of the detected object or is an empty string if no object is detected.
+
+    '''
     # Initialize the chessboard with empty strings
     chessboard_with_predictions = np.empty((8, 8), dtype=object)
     chessboard_with_predictions.fill("")  # Fill with empty strings
@@ -127,6 +233,19 @@ def detections_to_square(predictions, squares):
 
 
 def array_to_fen(arr):
+    '''Convert a chessboard array into its corresponding Forsyth–Edwards Notation (FEN) representation.
+
+    This function takes an 8x8 matrix representing a chessboard, where each cell contains a class name
+    of the chess piece or is an empty string if no piece is on that square. It then translates this
+    matrix to a FEN string which is a standard representation for the positions of pieces on a chessboard.
+
+    Args:
+        arr: An 8x8 matrix where each cell contains a class name of the chess piece
+            or is an empty string if no piece is on that square.
+
+    Returns:
+        A string representing the FEN notation of the given chessboard array.
+    '''
     fen_list = []
 
     for row in arr:
@@ -152,12 +271,35 @@ def array_to_fen(arr):
 
 
 def fen_to_link(fen_str):
+    '''Open a web browser with a Lichess analysis board for a given FEN string.
+
+    Given a Forsyth–Edwards Notation (FEN) string, this function constructs a URL
+    to view the chess position on Lichess's analysis board and opens it in a web browser.
+
+    Args:
+        fen_str: A string representing a chess position in FEN format.
+
+    '''
     base_url = "https://lichess.org/analysis/"
     full_url = base_url + fen_str
     webbrowser.open(full_url)
 
 
 def corner_boxes_to_points(pred):
+    '''Extract the corner points from the detected bounding boxes.
+
+    This function processes the detected bounding boxes to extract the specific
+    corner points based on the class index of the box.
+
+    Args:
+        pred: A list of detected bounding boxes in an order. Each box is represented as a tuple,
+            where the first four values are the bounding box coordinates (left, top, right, bottom),
+            and the sixth value is the class index indicating the specific corner.
+
+    Returns:
+        A numpy array with shape (4, 2) containing the (x, y) coordinates of the extracted corners.
+
+    '''
     corners = np.zeros((4, 2))
     for box in pred:
         if box[5] == 0 or box[5] == 3:
@@ -168,6 +310,21 @@ def corner_boxes_to_points(pred):
 
 
 def four_point_transform(image_np, pts):
+    '''Apply a perspective transformation to the given image using four points.
+
+    This function takes in an image and a set of four points, then performs a perspective
+    transformation (often called a "birds eye view" transformation) to obtain a top-down view
+    of the region defined by the four points.
+
+    Args:
+        image_np: The input image represented as a numpy array.
+        pts: A list containing four corner points which define the region to be transformed.
+            Each point is a tuple with two values (x, y).
+
+    Returns:
+        A numpy array representing the warped image after applying the perspective transform.
+
+    '''
 
     pts = np.array(pts, dtype=np.float32).reshape(4, 2)
     (tl, tr, br, bl) = pts
@@ -202,10 +359,31 @@ def four_point_transform(image_np, pts):
 
 
 def display_image(image):
+    '''Display the provided image in the notebook interface.
+
+    This function takes an OpenCV image, converts it to the JPEG format,
+    and then displays it directly within the Jupyter Notebook or IPython environment.
+
+    Args:
+        image: The input image represented as a numpy array in OpenCV format (BGR).
+
+    '''
     display(Image(data=cv2.imencode(".jpg", image)[1].tobytes()))
 
 
 def detect_corners(image):
+    '''Detect the four corners of a chessboard in the given image.
+
+    This function utilizes a trained YOLO model to identify the four corners
+    of a chessboard in the provided image. The model detects and returns bounding boxes for each corner.
+
+    Args:
+        image: The input image in which to detect the chessboard corners.
+
+    Returns:
+        A numpy array containing the (x, y) coordinates of the four detected corners.
+
+    '''
     # YOLO model trained to detect corners on a chessboard
     model_trained = YOLO(chessboard_corners_prediction_model)
 
@@ -229,6 +407,19 @@ def detect_corners(image):
 
 
 def detect_pieces(image):
+    '''Detect the chess pieces present on a cropped chessboard image.
+
+    This function utilizes a trained YOLO model to identify the chess pieces
+    on the provided chessboard image and returns their bounding boxes.
+
+    Args:
+        image: The cropped chessboard image in which to detect the chess pieces.
+
+    Returns:
+        A numpy array containing the bounding boxes of the detected chess pieces.
+        Each bounding box is represented as [left, top, right, bottom, confidence_score, class_index].
+
+    '''
     # YOLO model trained to detect corners on a cropped chessboard
     model_trained = YOLO(chess_pieces_prediction_model)
 
@@ -237,10 +428,24 @@ def detect_pieces(image):
     )
     prediction_boxes = piece_prediction[0].boxes.data.numpy()
 
-    return piece_prediction
+    return prediction_boxes
 
 
-def detect_pieces_2(image):
+def detect_pieces_limited(image):
+    '''Detect the chess pieces present on a cropped chessboard image using per-piece model configurations.
+
+    This function leverages a trained YOLO model to identify each type of chess piece
+    on the provided chessboard image based on individual configurations from a global
+    parameter set. It returns the combined bounding boxes of all detected pieces.
+
+    Args:
+        image: The cropped chessboard image in which to detect the chess pieces.
+
+    Returns:
+        A numpy array containing the bounding boxes of the detected chess pieces.
+        Each bounding box is represented as [left, top, right, bottom, confidence_score, class_index].
+
+    '''
     # YOLO model trained to detect corners on a cropped chessboard
     model_trained = YOLO(chess_pieces_prediction_model)
 
@@ -265,8 +470,23 @@ def detect_pieces_2(image):
 
 
 def display_predictions(image, predictions):
+    '''Display an image overlaid with bounding boxes of detected chess pieces.
+
+    This function visualizes the provided image and overlays the detected chess pieces
+    using bounding boxes. Each box is color-coded and labeled with the piece type
+    and the prediction confidence.
+
+    Args:
+        image: The base image on which predictions are to be displayed.
+        predictions: A list of detected chess piece predictions. Each prediction is
+            represented as [left, top, right, bottom, confidence_score, class_index].
+
+    '''
+    # Convert BGR image to RGB
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
     fig, ax = plt.subplots(1, figsize=(12, 9))
-    ax.imshow(image)
+    ax.imshow(image_rgb)
 
     # Class colors for better visualization
     colors = [
@@ -307,23 +527,53 @@ def display_predictions(image, predictions):
 
 
 def image_to_lichess(image_path):
+    def image_to_lichess(image_path):
+        '''
+        Convert an image of a chessboard to a Lichess board analysis link.
+
+        This function reads an image of a chessboard, detects the pieces on it,
+        converts the detections to a Forsyth-Edwards Notation (FEN) representation,
+        and then opens a Lichess board analysis page using the detected FEN.
+
+        Args:
+            image_path (str): The path to the input chessboard image.
+
+        '''
+
+    # Read the image from the provided path.
     image = cv2.imread(image_path)
+
+    # Display the original image.
     display_image(image)
+
+    # Detect corners of the chessboard using a trained model.
     corners = detect_corners(image)
+
+    # Use the detected corners to extract and warp the chessboard to get a bird's-eye view.
     image_cropped = four_point_transform(image, corners)
+
+    # Display the cropped and transformed chessboard.
     display_image(image_cropped)
 
-    # Detection without limiting instances of each piece
-
+    # Uncomment the below lines if you want to detect pieces without limiting instances of each piece.
     # prediction = detect_pieces(image_cropped)
     # boxes_nms = non_maximum_suppression(prediction)
 
-    # Detection with limiting instances of each piece
+    # Detect pieces on the cropped image using a trained model.
+    # This method limits instances of each piece for detection.
+    prediction = detect_pieces_limited(image_cropped)
 
-    prediction = detect_pieces_2(image_cropped)
+    # Apply Non-Maximum Suppression (NMS) to eliminate overlapping boxes.
     boxes_nms = non_maximum_suppression(prediction)
 
+    # Display the cropped image with the predicted bounding boxes overlaid.
     display_predictions(image_cropped, boxes_nms)
-    final = detections_to_square(boxes_nms, board_to_squares(image_cropped))
-    fen = array_to_fen(final)
+
+    # Convert the bounding box predictions to an 8x8 matrix representation of the chessboard.
+    chessboard_matrix = detections_to_square(boxes_nms, board_to_squares(image_cropped))
+
+    # Convert the matrix representation to a FEN string.
+    fen = array_to_fen(chessboard_matrix)
+
+    # Open a Lichess board analysis page with the detected FEN.
     fen_to_link(fen)
