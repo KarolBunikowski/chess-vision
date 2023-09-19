@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chess Vision GUI</title>
+    <style>
+        .image-container {
+            display: flex;
+            flex-direction: column; /* This will stack the images vertically */
+            align-items: center;    /* This will horizontally center the images */
+        }
+        .image-container img {
+            margin-bottom: 20px;   /* This will add space between the images */
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload Chessboard Image</h1>
+    <form action="/" method="post" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <input type="submit" value="Upload and Process">
+    </form>
+
+    {% if results %}
+    <h2>Results:</h2>
+    <div class="image-container">
+        <img src="data:image/jpeg;base64,{{ original_image_data }}" alt="Original Image">
+        <img src="data:image/jpeg;base64,{{ cropped_image_data }}" alt="Cropped Chessboard">
+        <img src="data:image/jpeg;base64,{{ processed_image_data }}" alt="Image with Predictions">
+    </div>
+    <a href="{{ lichess_link }}" target="_blank">Open in Lichess</a>
+    {% endif %}
+</body>
+</html>
