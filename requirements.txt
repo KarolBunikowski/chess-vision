@@ -1,0 +1,7 @@
+Flask==2.3.3
+jupyterlab==3.6.1
+matplotlib==3.7.1
+numpy==1.23.5
+Pillow==9.4.0
+shapely==2.0.1
+ultralytics==8.0.171

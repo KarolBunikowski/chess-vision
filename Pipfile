@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = false
+name = "pip_conf_index_global"
+
+[packages]
+matplotlib = "==3.7.1"
+numpy = "==1.23.5"
+pandas = "==1.5.3"
+scikit-learn = "==1.2.2"
+seaborn = "==0.12.2"
+flask = "==2.3.3"
+jupyterlab = "==3.6.1"
+pillow = "==9.4.0"
+shapely = "==2.0.1"
+ultralytics = "==8.0.171"
+
+[dev-packages]
+
+[requires]
+python_version = "3.11"
+python_full_version = "3.11.1"
