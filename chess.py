@@ -7,13 +7,15 @@ from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 import cv2
 from shapely.geometry import Polygon
+import base64
+from PIL import Image as PILImage
+from io import BytesIO
 
 # Constants
 CONFIG_FILE_PATH = "config.ini"
 
 def read_configuration(file_path):
-    '''
-    Read the configuration from a given file and return the parsed parameters.
+    '''Read the configuration from a given file and return the parsed parameters.
 
     Args:
         file_path (str): Path to the configuration file.
@@ -282,7 +284,8 @@ def fen_to_link(fen_str):
     '''
     base_url = "https://lichess.org/analysis/"
     full_url = base_url + fen_str
-    webbrowser.open(full_url)
+    # webbrowser.open(full_url)
+    return full_url
 
 
 def corner_boxes_to_points(pred):
@@ -325,7 +328,6 @@ def four_point_transform(image_np, pts):
         A numpy array representing the warped image after applying the perspective transform.
 
     '''
-
     pts = np.array(pts, dtype=np.float32).reshape(4, 2)
     (tl, tr, br, bl) = pts
 
@@ -384,6 +386,7 @@ def detect_corners(image):
         A numpy array containing the (x, y) coordinates of the four detected corners.
 
     '''
+    
     # YOLO model trained to detect corners on a chessboard
     model_trained = YOLO(chessboard_corners_prediction_model)
 
@@ -393,9 +396,6 @@ def detect_corners(image):
             source=image,
             conf=0.01,
             classes=i,
-            save_txt=True,
-            save=True,
-            save_conf=True,
             max_det=1,
         )
         found_corners.append(corner_prediction[0].boxes.data.numpy()[0])
@@ -424,7 +424,7 @@ def detect_pieces(image):
     model_trained = YOLO(chess_pieces_prediction_model)
 
     piece_prediction = model_trained.predict(
-        source=image, iou=0.85, conf=0.25, save_txt=True, save=True, save_conf=True
+        source=image, iou=0.85, conf=0.25
     )
     prediction_boxes = piece_prediction[0].boxes.data.numpy()
 
@@ -456,9 +456,6 @@ def detect_pieces_limited(image):
             iou=0.85,
             classes=class_num,
             conf=conf,
-            save_txt=True,
-            save=True,
-            save_conf=True,
             max_det=max_det,
         )
         predicted_pieces.append(prediction[0].boxes.data.numpy())
@@ -523,22 +520,36 @@ def display_predictions(image, predictions):
             bbox=dict(facecolor=colors[int(cls) % len(colors)], alpha=0.5),
         )
 
-    plt.show()
+
+    
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    img_with_predictions = PILImage.open(buf)
+    
+    # plt.show()
+    
+    return img_with_predictions
 
 
 def image_to_lichess(image_path):
-    def image_to_lichess(image_path):
-        '''
-        Convert an image of a chessboard to a Lichess board analysis link.
+    
+    '''
+    Convert an image of a chessboard to a Lichess board analysis link.
 
-        This function reads an image of a chessboard, detects the pieces on it,
-        converts the detections to a Forsyth-Edwards Notation (FEN) representation,
-        and then opens a Lichess board analysis page using the detected FEN.
+    This function reads an image of a chessboard, detects the pieces on it,
+    converts the detections to a Forsyth-Edwards Notation (FEN) representation,
+    and then opens a Lichess board analysis page using the detected FEN.
 
-        Args:
-            image_path (str): The path to the input chessboard image.
+    Args:
+        image_path (str): The path to the input chessboard image.
 
-        '''
+    Returns:
+        cropped_image_base64: cropped image of a chessboard found in the photo in Base64
+        image_with_predictions_base64: cropped image of a chessboard found in the photo in Base64
+        with bounding boxes of detected chess pieces
+        lichess_url: url to analysis of the position on lichess.org
+    '''
 
     # Read the image from the provided path.
     image = cv2.imread(image_path)
@@ -567,7 +578,7 @@ def image_to_lichess(image_path):
     boxes_nms = non_maximum_suppression(prediction)
 
     # Display the cropped image with the predicted bounding boxes overlaid.
-    display_predictions(image_cropped, boxes_nms)
+    image_with_predictions = display_predictions(image_cropped, boxes_nms)
 
     # Convert the bounding box predictions to an 8x8 matrix representation of the chessboard.
     chessboard_matrix = detections_to_square(boxes_nms, board_to_squares(image_cropped))
@@ -576,4 +587,20 @@ def image_to_lichess(image_path):
     fen = array_to_fen(chessboard_matrix)
 
     # Open a Lichess board analysis page with the detected FEN.
-    fen_to_link(fen)
+    lichess_url = fen_to_link(fen)
+    
+    #change image_cropped to PIL Image format
+    cropped_image_pil = PILImage.fromarray(cv2.cvtColor(image_cropped, cv2.COLOR_BGR2RGB))
+    
+    # Convert both images to Base64
+    buffered = BytesIO()
+    cropped_image_pil.save(buffered, format="JPEG")
+    cropped_image_base64 = base64.b64encode(buffered.getvalue()).decode()
+    
+    buffered = BytesIO()
+    image_with_predictions = image_with_predictions.convert("RGB")
+    image_with_predictions.save(buffered, format="JPEG")
+    image_with_predictions_base64 = base64.b64encode(buffered.getvalue()).decode()
+    
+    
+    return cropped_image_base64, image_with_predictions_base64, lichess_url
