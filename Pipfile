@@ -19,4 +19,3 @@ ultralytics = "==8.0.171"
 
 [requires]
 python_version = "3.11"
-python_full_version = "3.11.1"
