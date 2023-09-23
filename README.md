@@ -2,7 +2,9 @@
 
 ## Overview
 
-Chess Vision is an innovative project designed to recognize and analyze chess boards and pieces through images. Utilizing machine learning models, the system can accurately identify the positions of chess pieces on a board and translate this data into Forsyth-Edwards Notation (FEN). This FEN can subsequently be used for in-depth game analysis on platforms such as Lichess.
+Chess Vision is an innovative project designed to recognize and analyze chess boards and pieces through images. Utilizing machine learning models, the system can accurately identify the positions of chess pieces on a board and translate this data into Forsyth-Edwards Notation (FEN). This FEN can subsequently be used for in-depth position analysis on platforms such as Lichess.
+
+![Visualisation](./overview.jpg)
 
 ## Key Features
 
@@ -18,9 +20,11 @@ Chess Vision is an innovative project designed to recognize and analyze chess bo
 This feature allows you to convert an image of a chessboard into a Lichess board analysis link. It performs the following steps:
 
 1. Reads an image of a chessboard.
-2. Detects the pieces present.
-3. Converts these detections into FEN format.
-4. Opens a Lichess board analysis page using the FEN.
+2. Detects chessboard corners.
+3. Using detected corners crops and transforms the image.
+4. Detects the pieces present.
+5. Converts these detections into FEN format.
+6. Opens a Lichess board analysis page using the FEN.
 
 ## Configuration Settings
 
@@ -35,7 +39,6 @@ The project relies on the following libraries:
 
 - `ultralytics`
 - `IPython`
-- `webbrowser`
 - `numpy`
 - `matplotlib`
 - `cv2`
