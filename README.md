@@ -60,7 +60,7 @@ To get started, you have multiple options:
 
 ### Option 2: Using Docker
 
-If you prefer to use Docker, a `chess-vision.tar` Docker image file is provided.
+If you prefer to use Docker, a `chess-vision.tar` Docker image file is provided via Google Drive [here](https://drive.google.com/file/d/1ruriP6TBDnJtWdTyYPdeEoU_1vHbWK9m/view).
 
 1. Load the Docker image:  
     ```bash
