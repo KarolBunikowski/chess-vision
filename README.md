@@ -1,27 +1,37 @@
-# chess-vision
 # Chess Vision
 
-Chess Vision is a project that aims to detect and analyze chess boards and pieces from images. Using trained models, the project can identify the positions of chess pieces on a board and convert this information into the standard Forsyth-Edwards Notation (FEN). This FEN can then be used to analyze the game on platforms like Lichess.
+## Overview
 
-## Features
+Chess Vision is an innovative project designed to recognize and analyze chess boards and pieces through images. Utilizing machine learning models, the system can accurately identify the positions of chess pieces on a board and translate this data into Forsyth-Edwards Notation (FEN). This FEN can subsequently be used for in-depth game analysis on platforms such as Lichess.
 
-- **Chessboard Corner Detection**: Detects the four corners of a chessboard in an image.
-- **Chess Piece Detection**: Identifies the chess pieces on a board.
-- **FEN Generation**: Converts the detected chessboard state into a FEN string.
-- **Lichess Integration**: Opens a Lichess board analysis page using the detected FEN.
+## Key Features
 
-## Usage
+- **Corner Detection**: Pinpoints the four corners of a chessboard within an image.
+- **Piece Identification**: Recognizes individual chess pieces on the board.
+- **FEN Conversion**: Transforms the identified board state into a FEN string.
+- **Lichess Compatibility**: Directly opens a Lichess board analysis page using the generated FEN.
 
-1. **Image to Lichess**: Convert an image of a chessboard to a Lichess board analysis link. This function reads an image of a chessboard, detects the pieces on it, converts the detections to FEN representation, and then opens a Lichess board analysis page using the detected FEN.
+## How to Use
 
-## Configuration
+### Image to Lichess
 
-The project uses a configuration file (`config.ini`) to store global parameters and model paths. The configuration contains:
+This feature allows you to convert an image of a chessboard into a Lichess board analysis link. It performs the following steps:
 
-- **GLOBAL_PARAMS**: Parameters for each chess piece type.
-- **MODELS**: Paths to the trained models for chessboard corner prediction and chess piece prediction.
+1. Reads an image of a chessboard.
+2. Detects the pieces present.
+3. Converts these detections into FEN format.
+4. Opens a Lichess board analysis page using the FEN.
+
+## Configuration Settings
+
+The project employs a configuration file (`config.ini`) to manage global parameters and model paths. The configuration includes:
+
+- **Global Parameters**: Specific settings for each type of chess piece.
+- **Model Paths**: Locations of the trained models for corner and piece detection.
 
 ## Dependencies
+
+The project relies on the following libraries:
 
 - `ultralytics`
 - `IPython`
@@ -30,9 +40,36 @@ The project uses a configuration file (`config.ini`) to store global parameters 
 - `matplotlib`
 - `cv2`
 - `shapely`
+- `flask`
 
-## How to Run
+## Running the Project
+
+To get started, you have multiple options:
+
+### Option 1: Traditional Setup
 
 1. Clone the repository.
-2. Ensure you have the required dependencies installed.
-3. Run the `Project.ipynb` notebook to see the project in action.
+2. Install the necessary dependencies.
+3. Choose to run either:
+
+    a) The `Project.ipynb` notebook for a visual walkthrough.
+    
+    b) The `app.py` script to:
+    - Access a basic GUI at `http://127.0.0.1:5000`, or
+    - Use a bash command for a direct link to the analysis, e.g., `$ curl -X POST -F "file=@examples/example_1.jpg" http://127.0.0.1:5000/get-lichess-link`.
+
+### Option 2: Using Docker
+
+If you prefer to use Docker, a `chess-vision.tar` Docker image file is provided.
+
+1. Load the Docker image:  
+    ```bash
+    docker load -i chess-vision.tar
+    ```
+
+2. Run the Docker container:  
+    ```bash
+    docker run -p 5000:5000 chess-vision
+    ```
+
+3. Access the application via your web browser at `http://127.0.0.1:5000` or use the bash command for a direct link to the analysis as mentioned above.
